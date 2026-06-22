@@ -33,7 +33,7 @@ public class HistorialEstado {
     @Column(nullable = false)
     private Instant fecha = Instant.now();
 
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = true)
     @JoinColumn(name = "usuario_responsable_id")
     private User usuarioResponsable;
 
