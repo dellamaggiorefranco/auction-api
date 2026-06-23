@@ -6,10 +6,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import com.subastas.subastas_api.entity.User;
+import com.subastas.subastas_api.entity.Disputa;
 import com.subastas.subastas_api.entity.EstadoSubasta;
 import com.subastas.subastas_api.entity.HistorialEstado;
+import com.subastas.subastas_api.entity.Notificacion;
 import com.subastas.subastas_api.entity.Puja;
 import com.subastas.subastas_api.entity.Subasta;
+import com.subastas.subastas_api.repository.DisputaRepository;
 import com.subastas.subastas_api.repository.HistorialEstadoRepository;
 import com.subastas.subastas_api.repository.NotificacionRepository;
 import com.subastas.subastas_api.repository.PujaRepository;
@@ -22,16 +25,19 @@ public class SubastaService {
     private final SubastaRepository subastaRepository;
     private final PujaRepository pujaRepository;
     private final HistorialEstadoRepository historialEstadoRepository;
+    private final DisputaRepository disputaRepository;
     private final NotificacionRepository notificacionRepository;
 
     public SubastaService(SubastaRepository subastaRepository,
                           PujaRepository pujaRepository,
                           HistorialEstadoRepository historialEstadoRepository,
-                          NotificacionRepository notificacionRepository) {
+                          NotificacionRepository notificacionRepository,
+                        DisputaRepository disputaRepository) {
         this.subastaRepository = subastaRepository;
         this.pujaRepository = pujaRepository;
         this.historialEstadoRepository = historialEstadoRepository;
         this.notificacionRepository = notificacionRepository;
+        this.disputaRepository = disputaRepository;
     }
 
 @Transactional
@@ -154,7 +160,119 @@ public void procesarTransicionesAutomaticas() {
         EstadoSubasta estadoFinal = tienePujas ? EstadoSubasta.ADJUDICADA : EstadoSubasta.FINALIZADA;
         String motivo = tienePujas ? "Cierre automático con ganador" : "Cierre automático sin pujas";
         cambiarEstado(s, estadoFinal, null, motivo);
+        generarNotificacionesCierre(s);
     }
 }
+@Transactional
+public void cancelarSubasta(Long subastaId, User responsable, String motivo) {
+
+    Subasta subasta = subastaRepository.findById(subastaId)
+            .orElseThrow(() -> new RuntimeException("Subasta no encontrada"));
+
+    boolean esAdmin = responsable.getRoles().stream()
+            .anyMatch(r -> r.getName().equals("ADMIN"));
+
+    boolean esVendedor = subasta.getProducto().getVendedor().getId()
+            .equals(responsable.getId());
+
+    if (!esAdmin && !esVendedor) {
+        throw new RuntimeException("No tenés permiso para cancelar esta subasta");
+    }
+
+    if (esVendedor && !esAdmin) {
+        boolean tienePujas = subasta.getMontoActual() != null;
+        if (tienePujas) {
+            throw new RuntimeException("No podés cancelar una subasta que ya tiene pujas");
+        }
+    }
+
+    // Solo se pueden cancelar subastas en estos estados
+    if (subasta.getEstado() == EstadoSubasta.FINALIZADA ||
+        subasta.getEstado() == EstadoSubasta.ADJUDICADA ||
+        subasta.getEstado() == EstadoSubasta.CANCELADA) {
+        throw new RuntimeException("No se puede cancelar una subasta en estado " + subasta.getEstado());
+    }
+
+    cambiarEstado(subasta, EstadoSubasta.CANCELADA, responsable, motivo);
+}
+@Transactional
+public Disputa abrirDisputa(Long subastaId, User usuarioInicia, String motivo, String descripcion) {
+
+    Subasta subasta = subastaRepository.findById(subastaId)
+            .orElseThrow(() -> new RuntimeException("Subasta no encontrada"));
+
+    if (subasta.getEstado() != EstadoSubasta.ADJUDICADA) {
+        throw new RuntimeException("Solo se puede disputar una subasta ADJUDICADA");
+    }
+
+    boolean esVendedor = subasta.getProducto().getVendedor().getId().equals(usuarioInicia.getId());
+    boolean esGanador = subasta.getGanadorActual() != null &&
+            subasta.getGanadorActual().getId().equals(usuarioInicia.getId());
+
+    if (!esVendedor && !esGanador) {
+        throw new RuntimeException("Solo el vendedor o el ganador pueden abrir una disputa");
+    }
+
+    cambiarEstado(subasta, EstadoSubasta.EN_DISPUTA, usuarioInicia, "Disputa abierta: " + motivo);
+
+    Disputa disputa = new Disputa();
+    disputa.setSubasta(subasta);
+    disputa.setUsuarioInicia(usuarioInicia);
+    disputa.setMotivo(motivo);
+    disputa.setDescripcion(descripcion);
+
+    return disputaRepository.save(disputa);
+}
+
+@Transactional
+public Disputa resolverDisputa(Long disputaId, User admin, String categoriaResolucion) {
+
+    Disputa disputa = disputaRepository.findById(disputaId)
+            .orElseThrow(() -> new RuntimeException("Disputa no encontrada"));
+
+    boolean esAdmin = admin.getRoles().stream()
+            .anyMatch(r -> r.getName().equals("ADMIN"));
+
+    if (!esAdmin) {
+        throw new RuntimeException("Solo un ADMIN puede resolver una disputa");
+    }
+
+    disputa.setCategoriaResolucion(categoriaResolucion);
+    disputa.setFechaResolucion(Instant.now());
+    disputaRepository.save(disputa);
+
+    cambiarEstado(disputa.getSubasta(), EstadoSubasta.BORRADOR, admin, "Disputa resuelta: " + categoriaResolucion);
+
+    return disputa;
+}
+
+private void generarNotificacionesCierre(Subasta subasta) {
+
+    // Notificación al vendedor
+    Notificacion notifVendedor = new Notificacion();
+    notifVendedor.setDestinatario(subasta.getProducto().getVendedor());
+    notifVendedor.setSubasta(subasta);
+
+    if (subasta.getEstado() == EstadoSubasta.ADJUDICADA) {
+        notifVendedor.setMensaje("Tu subasta \"" + subasta.getProducto().getNombre() +
+                "\" finalizó con un ganador. Monto final: $" + subasta.getMontoActual());
+    } else {
+        notifVendedor.setMensaje("Tu subasta \"" + subasta.getProducto().getNombre() +
+                "\" finalizó sin pujas.");
+    }
+    notificacionRepository.save(notifVendedor);
+
+    // Notificación al ganador (solo si hay)
+    if (subasta.getGanadorActual() != null) {
+        Notificacion notifGanador = new Notificacion();
+        notifGanador.setDestinatario(subasta.getGanadorActual());
+        notifGanador.setSubasta(subasta);
+        notifGanador.setMensaje("¡Ganaste la subasta \"" + subasta.getProducto().getNombre() +
+                "\"! Monto final: $" + subasta.getMontoActual());
+        notificacionRepository.save(notifGanador);
+    }
+}
+
+
 
 }
