@@ -32,7 +32,6 @@ public class JwtFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        // 1. Buscar el token en el header
         String authHeader = request.getHeader("Authorization");
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -40,10 +39,8 @@ public class JwtFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 2. Extraer el token (sacar el "Bearer " del principio)
         String token = authHeader.substring(7);
 
-        // 3. Validar el token
         if (jwtService.isValid(token)) {
             String email = jwtService.extractEmail(token);
 
@@ -53,6 +50,10 @@ public class JwtFilter extends OncePerRequestFilter {
             List<SimpleGrantedAuthority> authorities = user.getRoles().stream()
                     .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName()))
                     .toList();
+
+            // Log temporal para debug
+            System.out.println("Usuario: " + email);
+            System.out.println("Roles: " + authorities);
 
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(email, null, authorities);
