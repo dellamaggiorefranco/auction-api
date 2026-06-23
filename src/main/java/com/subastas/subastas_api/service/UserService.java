@@ -28,6 +28,7 @@ public class UserService {
         this.jwtService = jwtService;
     }
 
+    // Registro
     public void register(String name, String email, String password) {
 
             // 1. Verificar que el email no esté en uso
@@ -52,6 +53,7 @@ public class UserService {
             userRepository.save(user);
     }
 
+    // Login
     public String login(String email, String password) {
 
         // 1. Buscar el usuario
@@ -65,5 +67,71 @@ public class UserService {
 
         // 3. Generar y devolver el token
         return jwtService.generateToken(user.getEmail());
+    }
+
+    // Auto-asignacion de rol SELLER
+    public void assignSellerRole(String email) {
+
+        // 1. Buscar el usuario
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        // 2. Buscar el rol SELLER
+        Role sellerRole = roleRepository.findByName("SELLER")
+                .orElseThrow(() -> new RuntimeException("Rol SELLER no encontrado"));
+
+        // 3. Agregarlo si no lo tiene ya
+        if (user.getRoles().contains(sellerRole)) {
+            throw new RuntimeException("El usuario ya tiene el rol SELLER");
+        }
+
+        user.getRoles().add(sellerRole);
+        userRepository.save(user);
+    }
+
+    // Asignacion de rol ADMIN por OTRO ADMIN
+    public void assignAdminRole(String emailObjetivo) {
+
+        // 1. Buscar el usuario al que le queremos dar el rol
+        User user = userRepository.findByEmail(emailObjetivo)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        // 2. Buscar el rol ADMIN
+        Role adminRole = roleRepository.findByName("ADMIN")
+                .orElseThrow(() -> new RuntimeException("Rol ADMIN no encontrado"));
+
+        // 3. Verificar que no lo tenga ya
+        if (user.getRoles().contains(adminRole)) {
+            throw new RuntimeException("El usuario ya tiene el rol ADMIN");
+        }
+
+        user.getRoles().add(adminRole);
+        userRepository.save(user);
+    }
+
+    // Bloquear usuario
+    public void blockUser(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (!user.isActive()) {
+            throw new RuntimeException("El usuario ya está bloqueado");
+        }
+
+        user.setActive(false);
+        userRepository.save(user);
+    }
+
+    // Desbloquear usuario
+    public void unblockUser(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (user.isActive()) {
+            throw new RuntimeException("El usuario ya está activo");
+        }
+
+        user.setActive(true);
+        userRepository.save(user);
     }
 }
