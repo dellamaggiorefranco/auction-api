@@ -25,7 +25,8 @@ public class UserInitializer implements CommandLineRunner {
 
         if(!userRepository.existsByEmail("franco@test.com")) {
 
-            Role userRole = roleRepository.findByName("USER");
+            Role userRole = roleRepository.findByName("USER")
+                    .orElseThrow(() -> new RuntimeException("Rol USER no encontrado"));
 
 
             User user = new User();
