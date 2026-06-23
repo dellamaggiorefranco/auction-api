@@ -26,7 +26,7 @@ public class PujaController {
     private final UserRepository userRepository;
 
     public PujaController(SubastaService subastaService,
-                          PujaRepository pujaRepository,
+                          PujaRepository pujaRepository, 
                           UserRepository userRepository) {
         this.subastaService = subastaService;
         this.pujaRepository = pujaRepository;
