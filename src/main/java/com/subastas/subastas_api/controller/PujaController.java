@@ -1,6 +1,10 @@
 package com.subastas.subastas_api.controller;
 
+import com.subastas.subastas_api.dto.PujaCompletaDTO;
+import com.subastas.subastas_api.dto.PujaPublicaDTO;
+import com.subastas.subastas_api.entity.EstadoSubasta;
 import com.subastas.subastas_api.entity.Puja;
+import com.subastas.subastas_api.entity.Subasta;
 import com.subastas.subastas_api.entity.User;
 import com.subastas.subastas_api.repository.PujaRepository;
 import com.subastas.subastas_api.repository.UserRepository;
@@ -39,10 +43,38 @@ public class PujaController {
         return ResponseEntity.ok(puja);
     }
 
-    // Ver pujas de una subasta — cualquier usuario autenticado
+    // Ver pujas de una subasta — con privacidad según rol
     @GetMapping
-    public List<Puja> listar(@PathVariable Long subastaId) {
-        return pujaRepository.findBySubastaIdOrderByMontoDesc(subastaId);
+    public ResponseEntity<?> listar(@PathVariable Long subastaId) {
+        User usuario = getUsuarioActual();
+        Subasta subasta = subastaService.obtenerSubasta(subastaId);
+
+        boolean esAdmin = usuario.getRoles().stream()
+                .anyMatch(r -> r.getName().equals("ADMIN"));
+
+        boolean esVendedor = subasta.getProducto().getVendedor().getId()
+                .equals(usuario.getId());
+
+        boolean subastaFinalizada = subasta.getEstado() == EstadoSubasta.FINALIZADA
+                || subasta.getEstado() == EstadoSubasta.ADJUDICADA;
+
+        // ADMIN ve todo siempre. Vendedor ve todo solo si ya cerró.
+        if (esAdmin || (esVendedor && subastaFinalizada)) {
+            List<PujaCompletaDTO> pujas = pujaRepository
+                    .findBySubastaIdOrderByMontoDesc(subastaId).stream()
+                    .map(p -> new PujaCompletaDTO(
+                            p.getId(), p.getMonto(), p.getFecha(),
+                            p.getOferente().getId(), p.getOferente().getEmail()))
+                    .toList();
+            return ResponseEntity.ok(pujas);
+        }
+
+        // Cualquier otro ve solo monto y fecha
+        List<PujaPublicaDTO> pujas = pujaRepository
+                .findBySubastaIdOrderByMontoDesc(subastaId).stream()
+                .map(p -> new PujaPublicaDTO(p.getId(), p.getMonto(), p.getFecha()))
+                .toList();
+        return ResponseEntity.ok(pujas);
     }
 
     // Ver mis pujas en una subasta

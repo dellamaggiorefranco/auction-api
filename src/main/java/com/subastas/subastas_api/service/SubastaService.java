@@ -39,6 +39,10 @@ public class SubastaService {
         this.notificacionRepository = notificacionRepository;
         this.disputaRepository = disputaRepository;
     }
+    public Subasta obtenerSubasta(Long id) {
+    return subastaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Subasta no encontrada"));
+}
 
 @Transactional
         public Puja registrarPuja(Long subastaId, User oferente, BigDecimal monto) {
