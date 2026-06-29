@@ -16,10 +16,6 @@ public class AuthController {
         this.userService = userService;
     }
 
-    @GetMapping("/perfil")
-    public ResponseEntity<String> perfil() {
-        return ResponseEntity.ok("Accediste a tu perfil");
-    }
 
     @PostMapping("/register")
     public ResponseEntity<String> register(@RequestBody RegisterRequest request) {

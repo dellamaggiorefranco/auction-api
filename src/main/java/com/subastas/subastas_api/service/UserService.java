@@ -2,6 +2,7 @@ package com.subastas.subastas_api.service;
 
 import com.subastas.subastas_api.entity.Role;
 import com.subastas.subastas_api.entity.User;
+import com.subastas.subastas_api.exception.*;
 import com.subastas.subastas_api.repository.RoleRepository;
 import com.subastas.subastas_api.repository.UserRepository;
 import com.subastas.subastas_api.security.JwtService;
@@ -33,7 +34,7 @@ public class UserService {
 
             // 1. Verificar que el email no esté en uso
             if (userRepository.existsByEmail(email)) {
-                throw new RuntimeException("El email ya está en uso");
+                throw new EmailYaEnUsoException(email);
             }
 
             // 2. Crear el usuario
@@ -46,7 +47,7 @@ public class UserService {
 
             // 4. Buscar el rol USER y asignarlo
             Role userRole = roleRepository.findByName("USER")
-                    .orElseThrow(() -> new RuntimeException("Rol USER no encontrado"));
+                    .orElseThrow(() -> new RolNoEncontradoException("USER"));
             user.setRoles(Set.of(userRole));
 
             // 5. Guardar
@@ -58,11 +59,11 @@ public class UserService {
 
         // 1. Buscar el usuario
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new UsuarioNoEncontradoException(email));
 
         // 2. Verificar el password
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new RuntimeException("Contraseña incorrecta");
+            throw new CredencialesInvalidasException();
         }
 
         // 3. Generar y devolver el token
@@ -74,15 +75,15 @@ public class UserService {
 
         // 1. Buscar el usuario
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new UsuarioNoEncontradoException(email));
 
         // 2. Buscar el rol SELLER
         Role sellerRole = roleRepository.findByName("SELLER")
-                .orElseThrow(() -> new RuntimeException("Rol SELLER no encontrado"));
+                .orElseThrow(() -> new RolNoEncontradoException("SELLER"));
 
         // 3. Agregarlo si no lo tiene ya
         if (user.getRoles().contains(sellerRole)) {
-            throw new RuntimeException("El usuario ya tiene el rol SELLER");
+            throw new RolYaAsignadoException("SELLER");
         }
 
         user.getRoles().add(sellerRole);
@@ -94,15 +95,15 @@ public class UserService {
 
         // 1. Buscar el usuario al que le queremos dar el rol
         User user = userRepository.findByEmail(emailObjetivo)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new UsuarioNoEncontradoException(emailObjetivo));
 
         // 2. Buscar el rol ADMIN
         Role adminRole = roleRepository.findByName("ADMIN")
-                .orElseThrow(() -> new RuntimeException("Rol ADMIN no encontrado"));
+                .orElseThrow(() -> new RolNoEncontradoException("ADMIN"));
 
         // 3. Verificar que no lo tenga ya
         if (user.getRoles().contains(adminRole)) {
-            throw new RuntimeException("El usuario ya tiene el rol ADMIN");
+            throw new RolYaAsignadoException("ADMIN");
         }
 
         user.getRoles().add(adminRole);
@@ -111,11 +112,12 @@ public class UserService {
 
     // Bloquear usuario
     public void blockUser(String email) {
+
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new UsuarioNoEncontradoException(email));
 
         if (!user.isActive()) {
-            throw new RuntimeException("El usuario ya está bloqueado");
+            throw new UsuarioBloqueadoException();
         }
 
         user.setActive(false);
@@ -124,11 +126,12 @@ public class UserService {
 
     // Desbloquear usuario
     public void unblockUser(String email) {
+
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new UsuarioNoEncontradoException(email));
 
         if (user.isActive()) {
-            throw new RuntimeException("El usuario ya está activo");
+            throw new UsuarioYaActivoException();
         }
 
         user.setActive(true);
