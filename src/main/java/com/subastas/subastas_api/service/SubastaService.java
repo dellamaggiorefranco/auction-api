@@ -9,11 +9,13 @@ import com.subastas.subastas_api.entity.User;
 import com.subastas.subastas_api.entity.Disputa;
 import com.subastas.subastas_api.entity.EstadoSubasta;
 import com.subastas.subastas_api.entity.HistorialEstado;
+import com.subastas.subastas_api.entity.Like;
 import com.subastas.subastas_api.entity.Notificacion;
 import com.subastas.subastas_api.entity.Puja;
 import com.subastas.subastas_api.entity.Subasta;
 import com.subastas.subastas_api.repository.DisputaRepository;
 import com.subastas.subastas_api.repository.HistorialEstadoRepository;
+import com.subastas.subastas_api.repository.LikeRepository;
 import com.subastas.subastas_api.repository.NotificacionRepository;
 import com.subastas.subastas_api.repository.PujaRepository;
 import com.subastas.subastas_api.repository.SubastaRepository;
@@ -27,17 +29,20 @@ public class SubastaService {
     private final HistorialEstadoRepository historialEstadoRepository;
     private final DisputaRepository disputaRepository;
     private final NotificacionRepository notificacionRepository;
+    private final LikeRepository likeRepository;
 
     public SubastaService(SubastaRepository subastaRepository,
                           PujaRepository pujaRepository,
                           HistorialEstadoRepository historialEstadoRepository,
                           NotificacionRepository notificacionRepository,
-                        DisputaRepository disputaRepository) {
+                        DisputaRepository disputaRepository,
+                      LikeRepository likeRepository) {
         this.subastaRepository = subastaRepository;
         this.pujaRepository = pujaRepository;
         this.historialEstadoRepository = historialEstadoRepository;
         this.notificacionRepository = notificacionRepository;
         this.disputaRepository = disputaRepository;
+        this.likeRepository = likeRepository;
     }
     public Subasta obtenerSubasta(Long id) {
     return subastaRepository.findById(id)
@@ -166,6 +171,31 @@ public void procesarTransicionesAutomaticas() {
         cambiarEstado(s, estadoFinal, null, motivo);
         generarNotificacionesCierre(s);
     }
+     // Notificar usuarios con like 1 hora antes de que abra la subasta
+        Instant en55min = ahora.plusSeconds(55 * 60);
+        Instant en65min = ahora.plusSeconds(65 * 60);
+
+        // Busca subastas PUBLICADAS cuya fechaInicio cae dentro de la ventana de 55 a 65 minutos
+        // La ventana de 10 minutos garantiza que el scheduler (que corre cada 60 segundos) la detecte exactamente una vez
+        List<Subasta> porNotificar = subastaRepository.findAll().stream()
+                .filter(s -> s.getEstado() == EstadoSubasta.PUBLICADA)
+                .filter(s -> s.getFechaInicio().isAfter(en55min) && s.getFechaInicio().isBefore(en65min))
+                .toList();
+
+        for (Subasta s : porNotificar) {
+            // Trae solo los likes donde notificado = false para no mandar la notificación dos veces
+            List<Like> likes = likeRepository.findBySubastaIdAndNotificadoFalse(s.getId());
+            for (Like like : likes) {
+                Notificacion notif = new Notificacion();
+                notif.setDestinatario(like.getUsuario());
+                notif.setSubasta(s);
+                notif.setMensaje("La subasta \"" + s.getProducto().getNombre() + "\" empieza en 1 hora. ¡No te la pierdas!");
+                notificacionRepository.save(notif);
+                // Marca el like como notificado para no volver a notificar en la próxima corrida del scheduler
+                like.setNotificado(true);
+                likeRepository.save(like);
+            }
+        }
 }
 @Transactional
 public void cancelarSubasta(Long subastaId, User responsable, String motivo) {
