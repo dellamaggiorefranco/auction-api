@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -28,10 +29,14 @@ public class SubastaController {
         this.userRepository = userRepository;
     }
 
-    // Listar todas — cualquier usuario autenticado
+    // Listar con filtros opcionales — cualquier usuario autenticado
     @GetMapping
-    public List<Subasta> listar() {
-        return subastaRepository.findAll();
+    public List<Subasta> listar(
+            @RequestParam(required = false) Long categoriaId,
+            @RequestParam(required = false) BigDecimal precioMin,
+            @RequestParam(required = false) BigDecimal precioMax,
+            @RequestParam(required = false) String nombre) {
+        return subastaRepository.filtrar(categoriaId, precioMin, precioMax, nombre);
     }
 
     // Ver una subasta — cualquier usuario autenticado
