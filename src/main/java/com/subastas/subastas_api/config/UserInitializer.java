@@ -2,6 +2,7 @@ package com.subastas.subastas_api.config;
 
 import com.subastas.subastas_api.entity.Role;
 import com.subastas.subastas_api.entity.User;
+import com.subastas.subastas_api.exception.RolNoEncontradoException;
 import com.subastas.subastas_api.repository.RoleRepository;
 import com.subastas.subastas_api.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
@@ -46,7 +47,7 @@ public class UserInitializer implements CommandLineRunner {
         // Crear usuario ADMIN de prueba
         if (!userRepository.existsByEmail("admin@test.com")) {
             Role adminRole = roleRepository.findByName("ADMIN")
-                    .orElseThrow(() -> new RuntimeException("Rol ADMIN no encontrado"));
+                    .orElseThrow(() -> new RolNoEncontradoException("ADMIN"));
 
             User admin = new User();
             admin.setName("Admin");
@@ -59,7 +60,7 @@ public class UserInitializer implements CommandLineRunner {
         // Crear usuario USER de prueba
         if (!userRepository.existsByEmail("franco@test.com")) {
             Role userRole = roleRepository.findByName("USER")
-                    .orElseThrow(() -> new RuntimeException("Rol USER no encontrado"));
+                    .orElseThrow(() -> new RolNoEncontradoException("USER"));
 
             User user = new User();
             user.setName("Franco");

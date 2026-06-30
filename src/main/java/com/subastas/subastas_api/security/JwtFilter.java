@@ -1,6 +1,7 @@
 package com.subastas.subastas_api.security;
 
 import com.subastas.subastas_api.entity.User;
+import com.subastas.subastas_api.exception.UsuarioNoEncontradoException;
 import com.subastas.subastas_api.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -45,7 +46,7 @@ public class JwtFilter extends OncePerRequestFilter {
             String email = jwtService.extractEmail(token);
 
             User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                    .orElseThrow(() -> new UsuarioNoEncontradoException(email));
 
             List<SimpleGrantedAuthority> authorities = user.getRoles().stream()
                     .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName()))
