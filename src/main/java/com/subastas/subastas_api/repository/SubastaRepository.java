@@ -22,7 +22,7 @@ public interface SubastaRepository extends JpaRepository<Subasta, Long> {
             "(:categoriaId IS NULL OR s.producto.categoria.id = :categoriaId) AND " +
             "(:precioMin IS NULL OR s.precioBase >= :precioMin) AND " +
             "(:precioMax IS NULL OR s.precioBase <= :precioMax) AND " +
-            "(:nombre IS NULL OR LOWER(s.producto.nombre) LIKE LOWER(CONCAT('%', :nombre, '%')))")
+            "(CAST(:nombre AS string) IS NULL OR LOWER(s.producto.nombre) LIKE LOWER(CONCAT('%', CAST(:nombre AS string), '%')))")
     List<Subasta> filtrar(@Param("categoriaId") Long categoriaId,
                           @Param("precioMin") BigDecimal precioMin,
                           @Param("precioMax") BigDecimal precioMax,
