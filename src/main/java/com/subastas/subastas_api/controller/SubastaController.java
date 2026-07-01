@@ -1,7 +1,9 @@
 package com.subastas.subastas_api.controller;
 
+import com.subastas.subastas_api.entity.Disputa;
 import com.subastas.subastas_api.entity.Subasta;
 import com.subastas.subastas_api.entity.User;
+import com.subastas.subastas_api.repository.DisputaRepository;
 import com.subastas.subastas_api.repository.SubastaRepository;
 import com.subastas.subastas_api.repository.UserRepository;
 import com.subastas.subastas_api.service.SubastaService;
@@ -20,13 +22,16 @@ public class SubastaController {
     private final SubastaService subastaService;
     private final SubastaRepository subastaRepository;
     private final UserRepository userRepository;
+    private final DisputaRepository disputaRepository;
 
     public SubastaController(SubastaService subastaService,
                              SubastaRepository subastaRepository,
-                             UserRepository userRepository) {
+                             UserRepository userRepository,
+                             DisputaRepository disputaRepository) {
         this.subastaService = subastaService;
         this.subastaRepository = subastaRepository;
         this.userRepository = userRepository;
+        this.disputaRepository = disputaRepository;
     }
 
     // Listar con filtros opcionales — cualquier usuario autenticado
@@ -37,6 +42,14 @@ public class SubastaController {
             @RequestParam(required = false) BigDecimal precioMax,
             @RequestParam(required = false) String nombre) {
         return subastaRepository.filtrar(categoriaId, precioMin, precioMax, nombre);
+    }
+
+    // Todas mis subastas como vendedor, sin importar el estado — solo SELLER
+    @GetMapping("/mias")
+    @PreAuthorize("hasRole('SELLER')")
+    public List<Subasta> misSubastas() {
+        User usuario = getUsuarioActual();
+        return subastaRepository.findByProductoVendedorId(usuario.getId());
     }
 
     // Ver una subasta — cualquier usuario autenticado
@@ -79,6 +92,13 @@ public class SubastaController {
                                           @RequestBody DisputaRequest request) {
         User usuario = getUsuarioActual();
         return ResponseEntity.ok(subastaService.abrirDisputa(id, usuario, request.motivo(), request.descripcion()));
+    }
+
+    // Listar disputas pendientes de resolver — solo ADMIN
+    @GetMapping("/disputas/pendientes")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<Disputa> disputasPendientes() {
+        return disputaRepository.findByFechaResolucionIsNull();
     }
 
     // Resolver disputa — solo ADMIN

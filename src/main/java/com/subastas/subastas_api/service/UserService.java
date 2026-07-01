@@ -9,6 +9,7 @@ import com.subastas.subastas_api.security.JwtService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Set;
 
 @Service
@@ -66,8 +67,13 @@ public class UserService {
             throw new CredencialesInvalidasException();
         }
 
-        // 3. Generar y devolver el token
-        return jwtService.generateToken(user.getEmail());
+        // 3. Extraer nombres de roles
+        List<String> roles = user.getRoles().stream()
+                .map(Role::getName)
+                .toList();
+
+        // 4. Generar y devolver el token con roles incluidos
+        return jwtService.generateToken(user.getEmail(), roles);
     }
 
     // Auto-asignacion de rol SELLER

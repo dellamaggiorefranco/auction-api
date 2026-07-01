@@ -27,4 +27,7 @@ public interface SubastaRepository extends JpaRepository<Subasta, Long> {
                           @Param("precioMin") BigDecimal precioMin,
                           @Param("precioMax") BigDecimal precioMax,
                           @Param("nombre") String nombre);
+
+    // Todas las subastas del vendedor, sin importar el estado
+    List<Subasta> findByProductoVendedorId(Long vendedorId);
 }

@@ -15,7 +15,6 @@ import java.time.Instant;
 })
 // Lombok genera automáticamente todos los getters (getId(), getUsuario(), etc.)
 @Getter
-// Lombok genera automáticamente todos los setters (setUsuario(), setSubasta(), etc.)
 @Setter
 // Lombok genera el constructor vacío que JPA necesita para crear objetos
 @NoArgsConstructor

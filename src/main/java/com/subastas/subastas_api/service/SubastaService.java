@@ -171,25 +171,25 @@ public void procesarTransicionesAutomaticas() {
         cambiarEstado(s, estadoFinal, null, motivo);
         generarNotificacionesCierre(s);
     }
-     // Notificar usuarios con like 1 hora antes de que abra la subasta
-        Instant en55min = ahora.plusSeconds(55 * 60);
-        Instant en65min = ahora.plusSeconds(65 * 60);
+     // Notificar usuarios con like desde que falta 1 hora o menos para que abra la subasta
+        Instant enUnaHora = ahora.plusSeconds(60 * 60);
 
-        // Busca subastas PUBLICADAS cuya fechaInicio cae dentro de la ventana de 55 a 65 minutos
-        // La ventana de 10 minutos garantiza que el scheduler (que corre cada 60 segundos) la detecte exactamente una vez
+        // Busca subastas PUBLICADAS cuya fechaInicio ya está a 1 hora o menos (y todavía no arrancó)
+        // El campo "notificado" del like garantiza que se avise una sola vez, aunque el scheduler la vea varias veces
         List<Subasta> porNotificar = subastaRepository.findAll().stream()
                 .filter(s -> s.getEstado() == EstadoSubasta.PUBLICADA)
-                .filter(s -> s.getFechaInicio().isAfter(en55min) && s.getFechaInicio().isBefore(en65min))
+                .filter(s -> s.getFechaInicio().isAfter(ahora) && s.getFechaInicio().isBefore(enUnaHora))
                 .toList();
 
         for (Subasta s : porNotificar) {
             // Trae solo los likes donde notificado = false para no mandar la notificación dos veces
             List<Like> likes = likeRepository.findBySubastaIdAndNotificadoFalse(s.getId());
+            long minutosRestantes = java.time.Duration.between(ahora, s.getFechaInicio()).toMinutes();
             for (Like like : likes) {
                 Notificacion notif = new Notificacion();
                 notif.setDestinatario(like.getUsuario());
                 notif.setSubasta(s);
-                notif.setMensaje("La subasta \"" + s.getProducto().getNombre() + "\" empieza en 1 hora. ¡No te la pierdas!");
+                notif.setMensaje("La subasta \"" + s.getProducto().getNombre() + "\" empieza en " + minutosRestantes + " minutos. ¡No te la pierdas!");
                 notificacionRepository.save(notif);
                 // Marca el like como notificado para no volver a notificar en la próxima corrida del scheduler
                 like.setNotificado(true);
